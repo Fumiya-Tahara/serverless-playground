@@ -1,12 +1,10 @@
 package handler
 
 import (
-	"context"
-	"encoding/json"
 	"net/http"
 
 	"github.com/Fumiya-Tahara/serverless-playground/internal/usecase/task"
-	"github.com/aws/aws-lambda-go/events"
+	"github.com/labstack/echo/v4"
 )
 
 type TaskHandler struct {
@@ -17,91 +15,77 @@ func NewTaskHandler(u task.TaskUsecase) *TaskHandler {
 	return &TaskHandler{usecase: u}
 }
 
-func (h *TaskHandler) CreateTask(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	var body struct {
+func (h *TaskHandler) CreateTask(c echo.Context) error {
+	type request struct {
 		Title   string `json:"title"`
 		Content string `json:"content"`
 	}
-
-	if err := json.Unmarshal([]byte(req.Body), &body); err != nil {
-		return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest}, nil
+	req := new(request)
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 
 	input := task.CreateTaskInput{
-		Title:   body.Title,
-		Content: body.Content,
+		Title:   req.Title,
+		Content: req.Content,
 	}
 
-	if err := h.usecase.Create(ctx, input); err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       err.Error(),
-		}, nil
+	if err := h.usecase.Create(c.Request().Context(), input); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusCreated,
-	}, nil
+	return c.NoContent(http.StatusCreated)
 }
 
-func (h *TaskHandler) ListTasks(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	outputs, err := h.usecase.FindAll(ctx)
+func (h *TaskHandler) ListTasks(c echo.Context) error {
+	outputs, err := h.usecase.FindAll(c.Request().Context())
 	if err != nil {
-		return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, nil
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"message": "failed to fetch tasks",
+		})
 	}
 
-	resBody, _ := json.Marshal(outputs)
-
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Body:       string(resBody),
-		Headers:    map[string]string{"Content-Type": "application/json"},
-	}, nil
+	return c.JSON(http.StatusOK, outputs)
 }
 
-func (h *TaskHandler) UpdateTask(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	taskID, ok := req.PathParameters["task_id"]
-	if !ok {
-		return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest}, nil
-	}
+func (h *TaskHandler) UpdateTask(c echo.Context) error {
+	taskID := c.Param("task_id")
 
-	var body struct {
+	type request struct {
 		Title   string `json:"title"`
 		Content string `json:"content"`
 	}
-	if err := json.Unmarshal([]byte(req.Body), &body); err != nil {
-		return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest}, nil
+	req := new(request)
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 
 	input := task.UpdateTaskInput{
 		ID:      taskID,
-		Title:   body.Title,
-		Content: body.Content,
+		Title:   req.Title,
+		Content: req.Content,
 	}
 
-	if err := h.usecase.Update(ctx, input); err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       err.Error(),
-		}, nil
+	if err := h.usecase.Update(c.Request().Context(), input); err != nil {
+		return c.JSON(http.StatusInternalServerError, nil)
 	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusNoContent,
-	}, nil
+	return c.NoContent(http.StatusNoContent)
 }
 
-func (h *TaskHandler) DeleteTask(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	taskID, ok := req.PathParameters["task_id"]
-	if !ok {
-		return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest}, nil
+func (h *TaskHandler) DeleteTask(c echo.Context) error {
+	id := c.Param("task_id")
+	if id == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "task_id is required",
+		})
 	}
 
-	if err := h.usecase.Delete(ctx, taskID); err != nil {
-		return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, nil
+	if err := h.usecase.Delete(c.Request().Context(), id); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"message": "failed to delete task",
+		})
 	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-	}, nil
+	return c.NoContent(http.StatusOK)
 }
