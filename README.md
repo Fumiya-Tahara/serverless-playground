@@ -1,0 +1,2 @@
+# serverless-playground
+サーバーレス構成のアプリケーションの練習用リポジトリ
