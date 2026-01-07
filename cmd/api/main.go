@@ -13,7 +13,7 @@ import (
 	echoadapter "github.com/awslabs/aws-lambda-go-api-proxy/echo"
 )
 
-var echoLambda *echoadapter.EchoLambda
+var echoLambda *echoadapter.EchoLambdaV2
 
 func init() {
 	repo := stub.NewMemoryTaskRepository()
@@ -22,10 +22,10 @@ func init() {
 
 	e := router.NewRouter(taskHandler)
 
-	echoLambda = echoadapter.New(e)
+	echoLambda = echoadapter.NewV2(e)
 }
 
-func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+func Handler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	return echoLambda.ProxyWithContext(ctx, req)
 }
 
