@@ -15,8 +15,16 @@ type memoryTaskRepository struct {
 }
 
 func NewMemoryTaskRepository() repository.TaskRepository {
+	tasks := make(map[string]*model.Task)
+
+	t1, _ := model.NewTask("1", "Lambdaの学習", "API Gatewayとの連携を確認する")
+	t2, _ := model.NewTask("2", "買い物", "卵，牛乳，小麦粉を買う")
+
+	tasks[t1.ID()] = t1
+	tasks[t2.ID()] = t2
+
 	return &memoryTaskRepository{
-		tasks: make(map[string]*model.Task),
+		tasks: tasks,
 	}
 }
 
